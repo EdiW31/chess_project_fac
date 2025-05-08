@@ -24,6 +24,8 @@ const Board = () => {
   }, []);
 
   const onDrop = ({ sourceSquare, targetSquare }) => {
+    console.log("Move:", sourceSquare, targetSquare); // Debugging
+    console.log("FEN:", fen); // Verifică FEN-ul curent
     axios
       .post("http://127.0.0.1:5000/api/move", {
         from: sourceSquare,
@@ -31,6 +33,7 @@ const Board = () => {
         fen: fen,
       })
       .then((response) => {
+        console.log("Response:", response.data); // Debugging
         if (response.data.status === "success") {
           setFen(response.data.fen);
           setMoves((prevMoves) => [
@@ -45,11 +48,14 @@ const Board = () => {
               setCapturedByWhite((prev) => [...prev, response.data.captured]);
             }
           }
+
+          if (response.data.ai_move) {
+            setMoves((prevMoves) => [
+              ...prevMoves,
+              `Bot: ${response.data.ai_move}`,
+            ]);
+          }
         } else {
-          setHighlightedSquares({
-            [targetSquare]: { backgroundColor: "rgba(255, 0, 0, 0.4)" },
-          });
-          setTimeout(() => setHighlightedSquares({}), 1000);
           alert(response.data.message || "Invalid move.");
         }
       })
