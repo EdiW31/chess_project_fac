@@ -8,27 +8,22 @@ CORS(app)
 
 def generate_random_setup():
     while True:
-        # Step 1: Shuffle the pieces for one side (e.g., white)
         pieces = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r']
         random.shuffle(pieces)
 
-        # Step 2: Ensure bishops are on opposite-colored squares
         bishop_indices = [i for i, p in enumerate(pieces) if p == 'b']
         if bishop_indices[0] % 2 == bishop_indices[1] % 2:
-            continue  # Bishops are on the same color, reshuffle
+            continue
 
-        # Step 3: Ensure the king is between the two rooks
         rook_indices = [i for i, p in enumerate(pieces) if p == 'r']
         king_index = pieces.index('k')
         if not (min(rook_indices) < king_index < max(rook_indices)):
-            continue  # King is not between the rooks, reshuffle
+            continue
 
-        # If both conditions are satisfied, break the loop
         break
 
-    # Step 4: Construct the FEN string
-    white_back_rank = ''.join(pieces).upper()  # White pieces
-    black_back_rank = ''.join(pieces).lower()  # Black pieces
+    white_back_rank = ''.join(pieces).upper()
+    black_back_rank = ''.join(pieces).lower()
     fen = f"{black_back_rank}/pppppppp/8/8/8/8/PPPPPPPP/{white_back_rank} w - - 0 1"
     return fen
 
@@ -59,8 +54,17 @@ def move():
     try:
         chess_move = chess.Move.from_uci(move)
         if chess_move in board.legal_moves:
+            captured_piece = None
+            if board.is_capture(chess_move):
+                captured_piece = board.piece_at(chess_move.to_square).symbol()
+
             board.push(chess_move)
-            return jsonify({"status": "success", "fen": board.fen()})
+            return jsonify({
+                "status": "success",
+                "fen": board.fen(),
+                "captured": captured_piece,
+                "turn": "w" if board.turn else "b"
+            })
         else:
             return jsonify({"status": "error", "message": "Illegal move."}), 400
     except Exception as e:
@@ -76,7 +80,3 @@ def legal_moves():
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-
-
-    

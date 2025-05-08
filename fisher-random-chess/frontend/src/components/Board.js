@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from "react";
 import Chessboard from "chessboardjsx";
 import axios from "axios";
+import MoveHistory from "./MoveHistory";
+import Score from "./Score";
+import "../styles/Board.scss";
 
 const Board = () => {
   const [fen, setFen] = useState("start");
   const [highlightedSquares, setHighlightedSquares] = useState({});
+  const [moves, setMoves] = useState([]);
+  const [capturedByWhite, setCapturedByWhite] = useState([]);
+  const [capturedByBlack, setCapturedByBlack] = useState([]);
 
   useEffect(() => {
-    // Fetch the initial random setup
     axios
       .get("http://127.0.0.1:5000/api/setup")
       .then((response) => {
@@ -27,12 +32,24 @@ const Board = () => {
       })
       .then((response) => {
         if (response.data.status === "success") {
-          setFen(response.data.fen); // Update the board with the new FEN
+          setFen(response.data.fen);
+          setMoves((prevMoves) => [
+            ...prevMoves,
+            `${sourceSquare}-${targetSquare}`,
+          ]);
+
+          if (response.data.captured) {
+            if (response.data.turn === "w") {
+              setCapturedByBlack((prev) => [...prev, response.data.captured]);
+            } else {
+              setCapturedByWhite((prev) => [...prev, response.data.captured]);
+            }
+          }
         } else {
           setHighlightedSquares({
-            [targetSquare]: { backgroundColor: "rgba(255, 0, 0, 0.4)" }, // Red for invalid move
+            [targetSquare]: { backgroundColor: "rgba(255, 0, 0, 0.4)" },
           });
-          setTimeout(() => setHighlightedSquares({}), 1000); // Clear after 1 second
+          setTimeout(() => setHighlightedSquares({}), 1000);
           alert(response.data.message || "Invalid move.");
         }
       })
@@ -42,37 +59,56 @@ const Board = () => {
       });
   };
 
-  const onMouseOverSquare = (square) => {
+  const resetGame = () => {
     axios
-      .post("http://127.0.0.1:5000/api/legal_moves", { fen, square })
+      .get("http://127.0.0.1:5000/api/setup")
       .then((response) => {
-        const legalMoves = response.data.moves;
-        const highlights = {};
-        legalMoves.forEach((move) => {
-          highlights[move] = { backgroundColor: "rgba(0, 255, 0, 0.4)" }; // Green for valid moves
-        });
-        setHighlightedSquares(highlights);
+        setFen(response.data);
+        setMoves([]);
+        setCapturedByWhite([]);
+        setCapturedByBlack([]);
       })
       .catch((error) => {
-        console.error("Error fetching legal moves:", error);
+        console.error("Error resetting game:", error);
       });
   };
 
-  const onMouseOutSquare = () => {
-    setHighlightedSquares({});
+  const getPieceImage = (piece) => {
+    return `/assets/chess-pieces/${piece}.png`;
   };
 
   return (
     <div>
       <h2>Fisher Random Chess</h2>
-      <Chessboard
-        position={fen}
-        onDrop={onDrop}
-        onMouseOverSquare={onMouseOverSquare}
-        onMouseOutSquare={onMouseOutSquare}
-        squareStyles={highlightedSquares}
-        draggable={true}
-      />
+      <button onClick={resetGame}>Reset Game</button>
+      <div className="chessboard-container">
+        <div className="captured-pieces">
+          <h3>Captured by White:</h3>
+          <div className="pieces">
+            {capturedByWhite.map((piece, index) => (
+              <img key={index} src={getPieceImage(piece)} alt={piece} />
+            ))}
+          </div>
+        </div>
+
+        <Chessboard
+          position={fen}
+          onDrop={onDrop}
+          squareStyles={highlightedSquares}
+          draggable={true}
+        />
+
+        <div className="captured-pieces">
+          <h3>Captured by Black:</h3>
+          <div className="pieces">
+            {capturedByBlack.map((piece, index) => (
+              <img key={index} src={getPieceImage(piece)} alt={piece} />
+            ))}
+          </div>
+        </div>
+      </div>
+      <MoveHistory moves={moves} />
+      <Score captured={[...capturedByWhite, ...capturedByBlack]} />
     </div>
   );
 };

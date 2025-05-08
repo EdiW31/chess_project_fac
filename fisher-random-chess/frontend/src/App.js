@@ -1,14 +1,15 @@
-import React from "react";
-import Header from "./components/Header";
+import { BrowserRouter as Router, Route, Switch } from "react-router-dom";
+import HomePage from "./components/HomePage";
 import Board from "./components/Board";
-import "./styles/App.css";
 
 function App() {
   return (
-    <div className="App">
-      <Header />
-      <Board />
-    </div>
+    <Router>
+      <Switch>
+        <Route exact path="/" component={HomePage} />
+        <Route path="/game" component={Board} />
+      </Switch>
+    </Router>
   );
 }
 

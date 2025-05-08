@@ -1,5 +1,9 @@
 {
   "dependencies": {
-    "chessboardjsx": "^2.4.7"
+    "chessboardjsx": "^2.4.7",
+    "sass": "^1.87.0"
+  },
+  "devDependencies": {
+    "resolve-url-loader": "^5.0.0"
   }
 }
