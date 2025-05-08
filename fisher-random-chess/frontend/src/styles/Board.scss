@@ -162,3 +162,40 @@ button {
     }
   }
 }
+.learning-data {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px;
+  color: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.learning-data h3,
+.learning-data h4 {
+  color: #ffcc00;
+}
+
+.learning-data ul {
+  list-style: none;
+  padding: 0;
+}
+
+.learning-data li {
+  margin: 5px 0;
+}
+
+.learning-data button {
+  background: #ffcc00;
+  color: #1e3c72;
+  border: none;
+  padding: 10px 20px;
+  font-size: 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+
+  &:hover {
+    background: #ffd633;
+  }
+}

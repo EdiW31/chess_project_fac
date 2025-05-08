@@ -3,11 +3,36 @@ from flask_cors import CORS
 import chess
 import random
 import chess.engine
+import json
+import os
 
 app = Flask(__name__)
 CORS(app)
 
 # Calea către executabilul Stockfish
+
+LEARNING_DATA_FILE = "learning_data.json"
+
+# Încarcă datele de învățare
+def load_learning_data():
+    if os.path.exists(LEARNING_DATA_FILE):
+        with open(LEARNING_DATA_FILE, "r") as file:
+            return json.load(file)
+    else:
+        return {
+            "piece_values": {
+                "p": 1, "n": 3, "b": 3, "r": 5, "q": 9,
+                "P": 1, "N": 3, "B": 3, "R": 5, "Q": 9
+            },
+            "games_played": 0
+        }
+
+# Salvează datele de învățare
+def save_learning_data(data):
+    with open(LEARNING_DATA_FILE, "w") as file:
+        json.dump(data, file)
+
+learning_data = load_learning_data()
 
 def generate_random_setup():
     while True:
@@ -40,19 +65,12 @@ def get_legal_moves(fen, square):
 
 def evaluate_board(board):
     """
-    Evaluează tabla de șah pe baza valorii pieselor.
+    Evaluează tabla de șah pe baza valorii pieselor și a datelor de învățare.
     """
-    piece_values = {
-        chess.PAWN: 1,
-        chess.KNIGHT: 3,
-        chess.BISHOP: 3,
-        chess.ROOK: 5,
-        chess.QUEEN: 9,
-        chess.KING: 0
-    }
+    piece_values = learning_data["piece_values"]
     score = 0
     for piece in board.piece_map().values():
-        value = piece_values.get(piece.piece_type, 0)
+        value = piece_values.get(piece.symbol(), 0)
         score += value if piece.color == chess.WHITE else -value
     return score
 
@@ -102,10 +120,35 @@ def calculate_score(captured_pieces):
     }
     return sum([piece_values.get(piece.lower(), 0) for piece in captured_pieces])
 
+def update_learning_data(winner):
+    """
+    Actualizează valorile pieselor în funcție de rezultatul jocului.
+    """
+    global captured_by_white, captured_by_black
+    if winner == "white":  # AI-ul a câștigat
+        for piece in captured_by_black:
+            learning_data["piece_values"][piece.lower()] += 0.1
+    elif winner == "black":  # AI-ul a pierdut
+        for piece in captured_by_white:
+            learning_data["piece_values"][piece.lower()] -= 0.1
+
+    # Normalizează valorile pentru a evita creșteri/scăderi excesive
+    for piece, value in learning_data["piece_values"].items():
+        learning_data["piece_values"][piece] = max(0.1, round(value, 2))
+
+    # Crește numărul de jocuri jucate
+    learning_data["games_played"] += 1
+    save_learning_data(learning_data)
+
+def determine_winner(board):
+    if board.is_checkmate():
+        return "white" if not board.turn else "black"
+    return "draw"
+
 # Variabile globale pentru piesele capturate
 captured_by_white = []
 captured_by_black = []
-#mogass
+
 @app.route('/')
 def index():
     return "Backend is running. Use /api/setup or /api/move."
@@ -120,39 +163,47 @@ def setup():
 def move():
     global captured_by_white, captured_by_black
     data = request.json
-    print("Received data:", data)  # Debugging
     fen = data['fen']
     move = f"{data['from']}{data['to']}"
-    print("FEN:", fen)  # Debugging
-    print("Move:", move)  # Debugging
+    promotion = data.get('promotion', 'q')  # Implicit promovăm la regină
     board = chess.Board(fen)
 
     try:
         chess_move = chess.Move.from_uci(move)
-        print("Attempting move:", chess_move)  # Debugging
-        if chess_move in board.legal_moves:
-            captured_piece = None
+        # Verifică dacă mutarea este validă
+        if chess_move in board.legal_moves or (
+            board.piece_at(chess_move.from_square).piece_type == chess.PAWN and
+            (chess_move.to_square in chess.SQUARES[:8] or chess_move.to_square in chess.SQUARES[-8:])
+        ):
+            # Verifică dacă este o promovare
+            if board.piece_at(chess_move.from_square).piece_type == chess.PAWN:
+                if chess_move.to_square in chess.SQUARES[:8] or chess_move.to_square in chess.SQUARES[-8:]:
+                    chess_move = chess.Move.from_uci(move + promotion)
+
             if board.is_capture(chess_move):
                 captured_piece = board.piece_at(chess_move.to_square).symbol()
-                if board.turn:  # Dacă este rândul albului, piesa capturată aparține negrului
+                if board.turn:
                     captured_by_black.append(captured_piece)
-                else:  # Dacă este rândul negrului, piesa capturată aparține albului
+                else:
                     captured_by_white.append(captured_piece)
 
             board.push(chess_move)
 
-            # Verifică dacă este șah sau mat după mutarea utilizatorului
-            is_check = board.is_check()
-            is_checkmate = board.is_checkmate()
+            if board.is_game_over():
+                winner = determine_winner(board)
+                update_learning_data(winner)
+                return jsonify({
+                    "status": "game_over",
+                    "winner": winner,
+                    "message": f"Game over! Winner: {winner}"
+                })
 
-            # Mutarea botului folosind Minimax
-            if not is_checkmate:
-                ai_move = make_ai_move(board)
-                if ai_move:
-                    if board.is_capture(ai_move):
-                        captured_piece = board.piece_at(ai_move.to_square).symbol()
-                        captured_by_white.append(captured_piece)
-                    board.push(ai_move)
+            ai_move = make_ai_move(board)
+            if ai_move:
+                if board.is_capture(ai_move):
+                    captured_piece = board.piece_at(ai_move.to_square).symbol()
+                    captured_by_white.append(captured_piece)
+                board.push(ai_move)
 
             response = {
                 "status": "success",
@@ -162,17 +213,14 @@ def move():
                 "score_white": calculate_score(captured_by_white),
                 "score_black": calculate_score(captured_by_black),
                 "turn": "w" if board.turn else "b",
-                "is_check": is_check,
-                "is_checkmate": is_checkmate,
+                "is_check": board.is_check(),
+                "is_checkmate": board.is_checkmate(),
                 "ai_move": ai_move.uci() if ai_move else None
             }
-            print("Response:", response)  # Debugging
             return jsonify(response)
         else:
-            print("Illegal move:", chess_move)  # Debugging
             return jsonify({"status": "error", "message": "Illegal move."}), 400
     except Exception as e:
-        print("Error:", str(e))  # Debugging
         return jsonify({"status": "error", "message": str(e)}), 400
 
 @app.route('/api/legal_moves', methods=['POST'])
@@ -196,6 +244,29 @@ def test_stockfish():
         return jsonify({"status": "success", "ai_move": ai_move.uci()})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
+
+@app.route('/api/learning_data', methods=['GET'])
+def get_learning_data():
+    """
+    Returnează datele de învățare curente.
+    """
+    return jsonify(learning_data)
+
+@app.route('/api/reset_learning_data', methods=['POST'])
+def reset_learning_data():
+    """
+    Resetează datele de învățare la valorile inițiale.
+    """
+    global learning_data
+    learning_data = {
+        "piece_values": {
+            "p": 1, "n": 3, "b": 3, "r": 5, "q": 9,
+            "P": 1, "N": 3, "B": 3, "R": 5, "Q": 9
+        },
+        "games_played": 0
+    }
+    save_learning_data(learning_data)
+    return jsonify({"status": "success", "message": "Learning data reset."})
 
 if __name__ == '__main__':
     app.run(debug=True)
