@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import Chessboard from "chessboardjsx";
 import axios from "axios";
 import MoveHistory from "./MoveHistory";
-import Score from "./Score";
+import Score from "./Score.js";
 import "../styles/Board.scss";
 
 const Board = () => {
@@ -11,6 +11,10 @@ const Board = () => {
   const [moves, setMoves] = useState([]);
   const [capturedByWhite, setCapturedByWhite] = useState([]);
   const [capturedByBlack, setCapturedByBlack] = useState([]);
+  const [scoreWhite, setScoreWhite] = useState(0);
+  const [scoreBlack, setScoreBlack] = useState(0);
+  const [isCheck, setIsCheck] = useState(false);
+  const [isCheckmate, setIsCheckmate] = useState(false);
 
   useEffect(() => {
     axios
@@ -24,8 +28,6 @@ const Board = () => {
   }, []);
 
   const onDrop = ({ sourceSquare, targetSquare }) => {
-    console.log("Move:", sourceSquare, targetSquare); // Debugging
-    console.log("FEN:", fen); // Verifică FEN-ul curent
     axios
       .post("http://127.0.0.1:5000/api/move", {
         from: sourceSquare,
@@ -41,13 +43,9 @@ const Board = () => {
             `${sourceSquare}-${targetSquare}`,
           ]);
 
-          if (response.data.captured) {
-            if (response.data.turn === "w") {
-              setCapturedByBlack((prev) => [...prev, response.data.captured]);
-            } else {
-              setCapturedByWhite((prev) => [...prev, response.data.captured]);
-            }
-          }
+          // Actualizează piesele capturate
+          setCapturedByWhite(response.data.captured_by_white || []);
+          setCapturedByBlack(response.data.captured_by_black || []);
 
           if (response.data.ai_move) {
             setMoves((prevMoves) => [
@@ -55,6 +53,14 @@ const Board = () => {
               `Bot: ${response.data.ai_move}`,
             ]);
           }
+
+          // Update scores
+          setScoreWhite(response.data.score_white || 0);
+          setScoreBlack(response.data.score_black || 0);
+
+          // Update check and checkmate status
+          setIsCheck(response.data.is_check || false);
+          setIsCheckmate(response.data.is_checkmate || false);
         } else {
           alert(response.data.message || "Invalid move.");
         }
@@ -73,6 +79,10 @@ const Board = () => {
         setMoves([]);
         setCapturedByWhite([]);
         setCapturedByBlack([]);
+        setScoreWhite(0);
+        setScoreBlack(0);
+        setIsCheck(false);
+        setIsCheckmate(false);
       })
       .catch((error) => {
         console.error("Error resetting game:", error);
@@ -87,34 +97,46 @@ const Board = () => {
     <div>
       <h2>Fisher Random Chess</h2>
       <button onClick={resetGame}>Reset Game</button>
-      <div className="chessboard-container">
-        <div className="captured-pieces">
-          <h3>Captured by White:</h3>
-          <div className="pieces">
-            {capturedByWhite.map((piece, index) => (
-              <img key={index} src={getPieceImage(piece)} alt={piece} />
-            ))}
-          </div>
+      <div className="game-container">
+        <div className="left-panel">
+          <Score
+            scoreBlack={scoreBlack}
+            scoreWhite={scoreWhite}
+            isCheck={isCheck}
+            isCheckmate={isCheckmate}
+          />
+          <MoveHistory moves={moves} />
         </div>
 
-        <Chessboard
-          position={fen}
-          onDrop={onDrop}
-          squareStyles={highlightedSquares}
-          draggable={true}
-        />
+        <div className="chessboard-container">
+          <Chessboard
+            position={fen}
+            onDrop={onDrop}
+            squareStyles={highlightedSquares}
+            draggable={true}
+          />
+        </div>
 
-        <div className="captured-pieces">
-          <h3>Captured by Black:</h3>
-          <div className="pieces">
-            {capturedByBlack.map((piece, index) => (
-              <img key={index} src={getPieceImage(piece)} alt={piece} />
-            ))}
+        <div className="right-panel">
+          <div className="captured-pieces">
+            <h3>Captured by Player:</h3>
+            <div className="pieces">
+              {capturedByBlack.map((piece, index) => (
+                <img key={index} src={getPieceImage(piece)} alt={piece} />
+              ))}
+            </div>
+          </div>
+
+          <div className="captured-pieces">
+            <h3>Captured by Bot:</h3>
+            <div className="pieces">
+              {capturedByWhite.map((piece, index) => (
+                <img key={index} src={getPieceImage(piece)} alt={piece} />
+              ))}
+            </div>
           </div>
         </div>
       </div>
-      <MoveHistory moves={moves} />
-      <Score captured={[...capturedByWhite, ...capturedByBlack]} />
     </div>
   );
 };
