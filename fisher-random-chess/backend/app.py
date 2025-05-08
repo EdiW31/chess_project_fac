@@ -105,7 +105,7 @@ def calculate_score(captured_pieces):
 # Variabile globale pentru piesele capturate
 captured_by_white = []
 captured_by_black = []
-
+#moga
 @app.route('/')
 def index():
     return "Backend is running. Use /api/setup or /api/move."
