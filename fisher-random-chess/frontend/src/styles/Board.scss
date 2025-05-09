@@ -22,6 +22,18 @@ h2 {
   padding: 20px;
 }
 
+.chessboard-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  
+  .square-highlight {
+    background: rgba(255, 255, 0, 0.4) !important;
+    border-radius: 50%;
+  }
+}
+
 .left-panel,
 .right-panel {
   flex: 1;

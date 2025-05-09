@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Chessboard from "chessboardjsx";
 import axios from "axios";
+import { Chess } from "chess.js";
 import MoveHistory from "./MoveHistory";
 import Score from "./Score.js";
 import "../styles/Board.scss";
@@ -15,7 +16,9 @@ const Board = () => {
   const [scoreBlack, setScoreBlack] = useState(0);
   const [isCheck, setIsCheck] = useState(false);
   const [isCheckmate, setIsCheckmate] = useState(false);
-  const [learningData, setLearningData] = useState(null); // Adaugă state pentru learningData
+  const [learningData, setLearningData] = useState(null); // Adaugă state pentru
+  //  learningData
+  const [validMoves, setValidMoves] = useState([]);
 
   useEffect(() => {
     // Fetch setup
@@ -97,6 +100,42 @@ const Board = () => {
       });
   };
 
+  const fetchValidMoves = async (square) => {
+    try {
+      const response = await axios.post("http://127.0.0.1:5000/api/legal_moves", {
+        fen: fen,
+        square: square,
+      });
+      const moves = response.data.moves;
+      const newHighlightedSquares = {};
+      moves.forEach((move) => {
+        newHighlightedSquares[move] = {
+          background: "rgba(255, 255, 0, 0.4)",
+          borderRadius: "50%",
+        };
+      });
+      setHighlightedSquares(newHighlightedSquares);
+    } catch (error) {
+      console.error("Error fetching valid moves:", error);
+    }
+  };
+
+  const onMouseOverSquare = (square) => {
+    try {
+      const chess = new Chess(fen);
+      const piece = chess.get(square);
+      if (piece) {
+        fetchValidMoves(square);
+      }
+    } catch (error) {
+      console.error("Error checking piece:", error);
+    }
+  };
+  
+  const onMouseOutSquare = () => {
+    setHighlightedSquares({});
+  };
+
   const resetGame = () => {
     axios
       .get("http://127.0.0.1:5000/api/start_game")
@@ -156,10 +195,12 @@ const Board = () => {
           <Chessboard
             position={fen}
             onDrop={onDrop}
+            onMouseOverSquare={onMouseOverSquare}
+            onMouseOutSquare={onMouseOutSquare}
             squareStyles={highlightedSquares}
             draggable={true}
           />
-        </div>
+      </div>
 
         <div className="right-panel">
           <div className="captured-pieces">
