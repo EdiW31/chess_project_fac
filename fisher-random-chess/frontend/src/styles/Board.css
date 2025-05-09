@@ -1,0 +1,198 @@
+@charset "UTF-8";
+body {
+  font-family: "Arial", sans-serif;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: #fff;
+  margin: 0;
+  padding: 0;
+}
+
+h2 {
+  text-align: center;
+  font-size: 2.5rem;
+  margin: 20px 0;
+  color: #ffcc00;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.game-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px;
+}
+
+.chessboard-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+.chessboard-container .square-highlight {
+  background: rgba(255, 255, 0, 0.4) !important;
+  border-radius: 50%;
+}
+
+.left-panel,
+.right-panel {
+  flex: 1;
+  min-width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.chessboard-container {
+  flex: 2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.captured-pieces {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+.captured-pieces h3 {
+  font-size: 1.5rem;
+  color: #ffcc00;
+  margin-bottom: 10px;
+}
+.captured-pieces .pieces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.captured-pieces .pieces img {
+  width: 50px;
+  height: 50px;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+.captured-pieces .pieces img:hover {
+  transform: scale(1.2);
+  filter: drop-shadow(0 0 10px #ffcc00);
+}
+
+.scores-container {
+  background: rgba(255, 255, 255, 0.1); /* Fundal semi-transparent */
+  border-radius: 10px;
+  padding: 15px;
+  text-align: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+.scores-container h3 {
+  font-size: 1.5rem;
+  color: #ffcc00;
+  margin-bottom: 10px;
+}
+.scores-container .score {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #fff;
+}
+.scores-container .score p {
+  margin: 5px 0;
+}
+
+.move-history {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+  max-height: 300px;
+}
+.move-history h3 {
+  font-size: 1.5rem;
+  color: #ffcc00;
+  margin-bottom: 10px;
+}
+.move-history ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.move-history ul li {
+  font-size: 1rem;
+  margin: 5px 0;
+  color: #fff;
+}
+
+button {
+  background: #ffcc00;
+  color: #1e3c72;
+  border: none;
+  padding: 10px 20px;
+  font-size: 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+button:hover {
+  background: #ffd633;
+  transform: scale(1.05);
+}
+
+.game-status {
+  margin-top: 15px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-align: center;
+}
+.game-status .status.checkmate {
+  color: #ff4d4d; /* Roșu pentru șah mat */
+}
+.game-status .status.check {
+  color: #ffcc00; /* Galben pentru șah */
+}
+.game-status .status.normal {
+  color: #fff; /* Alb pentru starea normală */
+}
+
+.learning-data {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px;
+  color: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.learning-data h3,
+.learning-data h4 {
+  color: #ffcc00;
+}
+
+.learning-data ul {
+  list-style: none;
+  padding: 0;
+}
+
+.learning-data li {
+  margin: 5px 0;
+}
+
+.learning-data button {
+  background: #ffcc00;
+  color: #1e3c72;
+  border: none;
+  padding: 10px 20px;
+  font-size: 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+.learning-data button:hover {
+  background: #ffd633;
+}/*# sourceMappingURL=Board.css.map */
