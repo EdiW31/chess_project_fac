@@ -6,7 +6,7 @@ const LearningData = () => {
 
   useEffect(() => {
     axios
-      .get("http://127.0.0.1:5000/api/learning_data")
+      .get("http://192.168.0.140:5000/api/learning_data")
       .then((response) => {
         setLearningData(response.data);
       })
@@ -17,7 +17,7 @@ const LearningData = () => {
 
   const resetLearningData = () => {
     axios
-      .post("http://127.0.0.1:5000/api/reset_learning_data")
+      .post("http://192.168.0.140:5000/api/reset_learning_data")
       .then(() => {
         alert("Learning data reset!");
         setLearningData(null); // Reîncarcă datele

@@ -5,6 +5,43 @@ import random
 import chess.engine
 import json
 import os
+import mysql.connector
+
+# Configurarea conexiunii la baza de date
+db_config = {
+    "host": "localhost",
+    "user": "root",  # Înlocuiește cu utilizatorul tău MySQL
+    "password": "12112003Ioan",  # Înlocuiește cu parola ta MySQL
+    "database": "fisher_random_chess"
+}
+
+# Creează o conexiune la baza de date
+db_connection = mysql.connector.connect(**db_config)
+db_cursor = db_connection.cursor()
+
+# Creează tabelele necesare
+def create_tables():
+    queries = [
+        """
+        CREATE TABLE IF NOT EXISTS learning_data (
+            piece CHAR(1) PRIMARY KEY,
+            value FLOAT NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS game_history (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            moves TEXT NOT NULL,
+            winner VARCHAR(10),
+            date_played TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    ]
+    for query in queries:
+        db_cursor.execute(query)
+    db_connection.commit()
+
+create_tables()
 
 app = Flask(__name__)
 CORS(app)
@@ -13,26 +50,49 @@ CORS(app)
 
 LEARNING_DATA_FILE = "learning_data.json"
 
-# Încarcă datele de învățare
+# Încarcă datele de învățare din baza de date
 def load_learning_data():
-    if os.path.exists(LEARNING_DATA_FILE):
-        with open(LEARNING_DATA_FILE, "r") as file:
-            return json.load(file)
-    else:
-        return {
-            "piece_values": {
-                "p": 1, "n": 3, "b": 3, "r": 5, "q": 9,
-                "P": 1, "N": 3, "B": 3, "R": 5, "Q": 9
-            },
-            "games_played": 0
-        }
+    default_data = {
+        "piece_values": {
+            "p": 1, "n": 3, "b": 3, "r": 5, "q": 9,
+            "P": 1, "N": 3, "B": 3, "R": 5, "Q": 9
+        },
+        "games_played": 0
+    }
+    for piece, value in default_data["piece_values"].items():
+        db_cursor.execute("""
+            INSERT INTO learning_data (piece, value)
+            VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE value = VALUES(value)
+        """, (piece, value))
+    db_connection.commit()
 
-# Salvează datele de învățare
+    # Încarcă datele din tabel
+    db_cursor.execute("SELECT piece, value FROM learning_data")
+    rows = db_cursor.fetchall()
+    return {
+        "piece_values": {row[0]: row[1] for row in rows},
+        "games_played": 0
+    }
+
+# Salvează datele de învățare în baza de date
 def save_learning_data(data):
-    with open(LEARNING_DATA_FILE, "w") as file:
-        json.dump(data, file)
+    for piece, value in data["piece_values"].items():
+        db_cursor.execute("UPDATE learning_data SET value = %s WHERE piece = %s", (value, piece))
+    db_connection.commit()
 
 learning_data = load_learning_data()
+
+def save_game_history(moves, winner):
+    try:
+        print(f"Saving game history: moves={moves}, winner={winner}")  # Debugging
+        db_cursor.execute(
+            "INSERT INTO game_history (moves, winner) VALUES (%s, %s)",
+            (json.dumps(moves), winner)
+        )
+        db_connection.commit()
+    except Exception as e:
+        print(f"Error saving game history: {e}")  # Debugging
 
 def generate_random_setup():
     while True:
@@ -111,6 +171,8 @@ def make_ai_move(board, depth=2):
         if board_value > best_value:
             best_value = board_value
             best_move = move
+    if best_move:
+        print(f"AI move: {best_move.uci()}")  # Debugging
     return best_move
 
 def calculate_score(captured_pieces):
@@ -138,16 +200,23 @@ def update_learning_data(winner):
 
     # Crește numărul de jocuri jucate
     learning_data["games_played"] += 1
+    db_cursor.execute("UPDATE learning_data SET value = %s WHERE piece = %s", 
+                      (learning_data["games_played"], "games_played"))
+    db_connection.commit()
+
     save_learning_data(learning_data)
 
 def determine_winner(board):
     if board.is_checkmate():
-        return "white" if not board.turn else "black"
+        return "white" if not board.turn else "black"  # Dacă este șah-mat, câștigătorul este adversarul
     return "draw"
 
 # Variabile globale pentru piesele capturate
 captured_by_white = []
 captured_by_black = []
+
+# Variabile globale pentru jocurile multiplayer
+multiplayer_games = {}
 
 @app.route('/')
 def index():
@@ -190,7 +259,9 @@ def move():
             board.push(chess_move)
 
             if board.is_game_over():
+                print(f"Game over detected. Checkmate: {board.is_checkmate()}, Winner: {determine_winner(board)}")  # Debugging
                 winner = determine_winner(board)
+                save_game_history([move.uci() for move in board.move_stack], winner)  # Salvează istoricul mutărilor
                 update_learning_data(winner)
                 return jsonify({
                     "status": "game_over",
@@ -236,6 +307,81 @@ def start_game():
     fen = generate_random_setup()
     return jsonify({"fen": fen, "status": "success"})
 
+@app.route('/api/start_multiplayer_game', methods=['POST'])
+def start_multiplayer_game():
+    """
+    Inițializează un joc multiplayer.
+    """
+    fen = generate_random_setup()
+    game_id = random.randint(1000, 9999)  # Creează un ID unic pentru joc
+    multiplayer_games[game_id] = {
+        "fen": fen,
+        "turn": "w",
+        "moves": []
+    }
+    return jsonify({"status": "success", "game_id": game_id, "fen": fen})
+
+@app.route('/api/multiplayer_move', methods=['POST'])
+def multiplayer_move():
+    """
+    Gestionează mutările într-un joc multiplayer.
+    """
+    data = request.json
+    game_id = data['game_id']
+    move = data['move']
+    if game_id not in multiplayer_games:
+        return jsonify({"status": "error", "message": "Game not found"}), 404
+
+    game = multiplayer_games[game_id]
+    board = chess.Board(game["fen"])
+
+    try:
+        chess_move = chess.Move.from_uci(move)
+        if chess_move in board.legal_moves:
+            board.push(chess_move)
+            game["fen"] = board.fen()
+            game["moves"].append(move)
+            game["turn"] = "w" if board.turn else "b"
+
+            if board.is_game_over():
+                winner = determine_winner(board)
+                return jsonify({
+                    "status": "game_over",
+                    "winner": winner,
+                    "message": f"Game over! Winner: {winner}"
+                })
+
+            return jsonify({
+                "status": "success",
+                "fen": game["fen"],
+                "turn": game["turn"],
+                "moves": game["moves"]
+            })
+        else:
+            return jsonify({"status": "error", "message": "Illegal move"}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+@app.route('/api/join_game', methods=['POST'])
+def join_game():
+    """
+    Permite unui jucător să se alăture unui joc multiplayer existent.
+    """
+    data = request.json
+    game_id = data.get('game_id')
+
+    if game_id not in multiplayer_games:
+        return jsonify({"status": "error", "message": "Game not found"}), 404
+
+    game = multiplayer_games[game_id]
+    return jsonify({
+        "status": "success",
+        "game_id": game_id,
+        "fen": game["fen"],
+        "moves": game["moves"],
+        "turn": game["turn"]
+    })
+
 @app.route('/api/test_stockfish', methods=['GET'])
 def test_stockfish():
     board = chess.Board()
@@ -250,7 +396,15 @@ def get_learning_data():
     """
     Returnează datele de învățare curente.
     """
-    return jsonify(learning_data)
+    db_cursor.execute("SELECT piece, value FROM learning_data")
+    rows = db_cursor.fetchall()
+    piece_values = {row[0]: row[1] for row in rows if row[0] != "games_played"}
+    games_played = next((row[1] for row in rows if row[0] == "games_played"), 0)
+
+    return jsonify({
+        "piece_values": piece_values,
+        "games_played": games_played
+    })
 
 @app.route('/api/reset_learning_data', methods=['POST'])
 def reset_learning_data():
@@ -269,4 +423,4 @@ def reset_learning_data():
     return jsonify({"status": "success", "message": "Learning data reset."})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
