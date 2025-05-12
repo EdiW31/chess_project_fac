@@ -195,4 +195,12 @@ button:hover {
 }
 .learning-data button:hover {
   background: #ffd633;
-}/*# sourceMappingURL=Board.css.map */
+}
+
+.turn-indicator {
+  text-align: center;
+  margin: 10px 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+} /*# sourceMappingURL=Board.css.map */

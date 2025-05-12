@@ -6,6 +6,7 @@ import chess.engine
 import json
 import os
 import mysql.connector
+from flask_socketio import SocketIO, emit, join_room, leave_room
 
 # Configurarea conexiunii la baza de date
 db_config = {
@@ -45,6 +46,9 @@ create_tables()
 
 app = Flask(__name__)
 CORS(app)
+
+# Creează instanța SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Calea către executabilul Stockfish
 
@@ -158,7 +162,7 @@ def minimax(board, depth, is_maximizing):
             min_eval = min(min_eval, eval)
         return min_eval
 
-def make_ai_move(board, depth=2):
+def make_ai_move(board, depth=3):
     """
     Găsește cea mai bună mutare pentru AI folosind Minimax.
     """
@@ -382,6 +386,23 @@ def join_game():
         "turn": game["turn"]
     })
 
+@app.route('/api/game_state/<game_id>', methods=['GET'])
+def get_game_state(game_id):
+    """
+    Returnează starea curentă a jocului multiplayer.
+    """
+    if game_id not in multiplayer_games:
+        return jsonify({"status": "error", "message": "Game not found"}), 404
+
+    game = multiplayer_games[game_id]
+    return jsonify({
+        "status": "success",
+        "game_id": game_id,
+        "fen": game["fen"],
+        "turn": game["turn"],
+        "moves": game["moves"]
+    })
+
 @app.route('/api/test_stockfish', methods=['GET'])
 def test_stockfish():
     board = chess.Board()
@@ -421,6 +442,66 @@ def reset_learning_data():
     }
     save_learning_data(learning_data)
     return jsonify({"status": "success", "message": "Learning data reset."})
-#moga
+
+@socketio.on('create_game')
+def create_game():
+    """
+    Creează un joc multiplayer și alocă un ID unic.
+    """
+    game_id = str(random.randint(1000, 9999))  # ID unic pentru joc
+    multiplayer_games[game_id] = {
+        "fen": generate_random_setup(),
+        "turn": "w",
+        "moves": []
+    }
+    join_room(game_id)
+    emit('game_created', {"game_id": game_id, "fen": multiplayer_games[game_id]["fen"]}, room=game_id)
+
+@socketio.on('join_game')
+def join_game(data):
+    """
+    Permite unui jucător să se alăture unui joc multiplayer existent.
+    """
+    game_id = data.get('game_id')
+    if game_id in multiplayer_games:
+        join_room(game_id)
+        emit('game_joined', {"game_id": game_id, "fen": multiplayer_games[game_id]["fen"]}, room=game_id)
+    else:
+        emit('error', {"message": "Game not found."})
+
+@socketio.on('make_move')
+def make_move(data):
+    """
+    Gestionează mutările într-un joc multiplayer.
+    """
+    game_id = data.get('game_id')
+    move = data.get('move')
+
+    if game_id not in multiplayer_games:
+        emit('error', {"message": "Game not found."})
+        return
+
+    game = multiplayer_games[game_id]
+    board = chess.Board(game["fen"])
+
+    try:
+        chess_move = chess.Move.from_uci(move)
+        if chess_move in board.legal_moves:
+            board.push(chess_move)
+            game["fen"] = board.fen()
+            game["moves"].append(move)
+            game["turn"] = "w" if board.turn else "b"
+
+            # Notifică jucătorii să sincronizeze starea jocului
+            emit('sync_game', {"game_id": game_id}, room=game_id)
+
+            if board.is_game_over():
+                winner = determine_winner(board)
+                emit('game_over', {"winner": winner, "fen": game["fen"]}, room=game_id)
+        else:
+            emit('error', {"message": "Illegal move."})
+    except Exception as e:
+        emit('error', {"message": str(e)})
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

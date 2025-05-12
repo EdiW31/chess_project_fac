@@ -5,6 +5,9 @@ import { Chess } from "chess.js";
 import Score from "./Score.js";
 import GameModeSelection from "./GameModeSelection";
 import "../styles/Board.scss";
+import { io } from "socket.io-client";
+
+const socket = io("http://127.0.0.1:5000"); // Adresa backend-ului
 
 const Board = () => {
   const [gameMode, setGameMode] = useState(null); // "ai" sau "friend"
@@ -18,6 +21,7 @@ const Board = () => {
     scoreBlack: 0,
     isCheck: false,
     isCheckmate: false,
+    turn: "w",
   });
 
   const [capturedPieces, setCapturedPieces] = useState({
@@ -44,6 +48,97 @@ const Board = () => {
         console.error("Error fetching learning data:", error);
       });
   }, []);
+
+  useEffect(() => {
+    // Evenimente WebSocket
+    socket.on("game_created", (data) => {
+      setGameId(data.game_id);
+      setGameState({ fen: data.fen, turn: "w" });
+    });
+
+    socket.on("game_joined", (data) => {
+      setGameId(data.game_id);
+      setGameState({ fen: data.fen, turn: "w" });
+    });
+
+    return () => {
+      socket.off(); // Dezactivează evenimentele la demontarea componentei
+    };
+  }, []);
+
+  useEffect(() => {
+    socket.on("move_made", (data) => {
+      setGameState((prev) => ({
+        ...prev,
+        fen: data.fen,
+        turn: data.turn,
+      }));
+    });
+
+    socket.on("game_over", (data) => {
+      alert(`Game over! Winner: ${data.winner}`);
+      setGameState((prev) => ({
+        ...prev,
+        fen: data.fen,
+        turn: null,
+      }));
+    });
+
+    return () => {
+      socket.off("move_made");
+      socket.off("game_over");
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncGameState = async () => {
+      if (!gameId) return;
+
+      try {
+        const response = await axios.get(
+          `http://127.0.0.1:5000/api/game_state/${gameId}`
+        );
+        if (response.data.status === "success") {
+          setGameState((prev) => ({
+            ...prev,
+            fen: response.data.fen,
+            turn: response.data.turn,
+            moves: response.data.moves,
+          }));
+        }
+      } catch (error) {
+        console.error("Error syncing game state:", error);
+      }
+    };
+
+    const interval = setInterval(syncGameState, 2000); // Sincronizare la fiecare 2 secunde
+    return () => clearInterval(interval); // Curăță intervalul la demontarea componentei
+  }, [gameId]);
+
+  useEffect(() => {
+    socket.on("sync_game", (data) => {
+      if (data.game_id === gameId) {
+        // Sincronizează starea jocului
+        axios
+          .get(`http://127.0.0.1:5000/api/game_state/${gameId}`)
+          .then((response) => {
+            if (response.data.status === "success") {
+              setGameState((prev) => ({
+                ...prev,
+                fen: response.data.fen,
+                turn: response.data.turn,
+                moves: response.data.moves,
+              }));
+            }
+          })
+          .catch((error) => console.error("Error syncing game state:", error));
+      }
+    });
+
+    return () => {
+      socket.off("sync_game");
+    };
+  }, [gameId]);
 
   // API calls
   const initializeGame = async () => {
@@ -88,16 +183,7 @@ const Board = () => {
   };
 
   const startMultiplayerGame = () => {
-    axios
-      .post("http://127.0.0.1:5000/api/start_multiplayer_game")
-      .then((res) => {
-        console.log("Multiplayer game started:", res.data); // Debugging
-        setGameId(res.data.game_id); // Setează Game ID
-        setGameState({ fen: res.data.fen, moves: [] }); // Setează starea jocului
-      })
-      .catch((error) => {
-        console.error("Error starting multiplayer game:", error);
-      });
+    socket.emit("create_game");
   };
 
   const joinMultiplayerGame = () => {
@@ -106,20 +192,7 @@ const Board = () => {
       return;
     }
 
-    axios
-      .post("http://192.168.0.140:5000/api/join_game", { game_id: gameId })
-      .then((res) => {
-        if (res.data.status === "success") {
-          console.log("Joined game:", res.data); // Debugging
-          setGameState({ fen: res.data.fen, moves: res.data.moves }); // Setează starea jocului
-        } else {
-          alert(res.data.message || "Failed to join game.");
-        }
-      })
-      .catch((error) => {
-        console.error("Error joining game:", error);
-        alert("Game not found or network error.");
-      });
+    socket.emit("join_game", { game_id: gameId });
   };
 
   // Event handlers
@@ -127,15 +200,8 @@ const Board = () => {
     const isPawnPromotion = checkPawnPromotion(sourceSquare, targetSquare);
     const promotion = isPawnPromotion ? "q" : null;
 
-    axios
-      .post("http://127.0.0.1:5000/api/move", {
-        from: sourceSquare,
-        to: targetSquare,
-        fen: gameState.fen,
-        promotion,
-      })
-      .then(handleMoveResponse)
-      .catch(handleMoveError);
+    const move = `${sourceSquare}${targetSquare}`;
+    socket.emit("make_move", { game_id: gameId, move, promotion });
   };
 
   const onMouseOverSquare = (square) => {
@@ -179,6 +245,11 @@ const Board = () => {
       sourceSquare[1] === "2" &&
       targetSquare[1] === "1";
     return isWhitePawn || isBlackPawn;
+  };
+
+  const makeMove = (sourceSquare, targetSquare) => {
+    const move = `${sourceSquare}${targetSquare}`;
+    socket.emit("make_move", { game_id, move });
   };
 
   const handleMoveResponse = (response) => {
@@ -252,7 +323,17 @@ const Board = () => {
       <div>
         <h2>Multiplayer Game</h2>
         <p>Game ID: {gameId}</p>
-        {/* Afișează tabla de șah și gestionează mutările */}
+        <div className="turn-indicator">
+          <h3>Turn: {gameState.turn === "w" ? "White" : "Black"}</h3>
+        </div>
+        <Chessboard
+          position={gameState.fen}
+          onDrop={onDrop}
+          onMouseOverSquare={onMouseOverSquare}
+          onMouseOutSquare={onMouseOutSquare}
+          squareStyles={highlightedSquares}
+          draggable={true}
+        />
       </div>
     );
   }
@@ -302,6 +383,9 @@ const Board = () => {
             squareStyles={highlightedSquares}
             draggable={true}
           />
+          <div className="turn-indicator">
+            <h3>Turn: {gameState.turn === "w" ? "White" : "Black"}</h3>
+          </div>
         </div>
 
         <div className="right-panel">
