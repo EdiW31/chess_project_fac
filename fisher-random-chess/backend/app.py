@@ -129,18 +129,35 @@ def get_legal_moves(fen, square):
 
 def evaluate_board(board):
     """
-    Evaluează tabla de șah pe baza valorii pieselor și a datelor de învățare.
+    Evaluează tabla de șah pe baza valorii pieselor, controlului centrului și siguranței regelui.
     """
     piece_values = learning_data["piece_values"]
     score = 0
-    for piece in board.piece_map().values():
+
+    # Valoarea pieselor
+    for square, piece in board.piece_map().items():
         value = piece_values.get(piece.symbol(), 0)
         score += value if piece.color == chess.WHITE else -value
+
+    # Controlul centrului
+    center_squares = [chess.D4, chess.D5, chess.E4, chess.E5]
+    for square in center_squares:
+        if board.piece_at(square):
+            piece = board.piece_at(square)
+            score += 0.5 if piece.color == chess.WHITE else -0.5
+
+    # Mobilitatea
+    score += 0.1 * len(list(board.legal_moves)) if board.turn == chess.WHITE else -0.1 * len(list(board.legal_moves))
+
+    # Siguranța regelui
+    if board.is_check():
+        score -= 1 if board.turn == chess.WHITE else -1
+
     return score
 
-def minimax(board, depth, is_maximizing):
+def minimax(board, depth, alpha, beta, is_maximizing):
     """
-    Algoritmul Minimax pentru a calcula cea mai bună mutare.
+    Algoritmul Minimax cu Alpha-Beta Pruning.
     """
     if depth == 0 or board.is_game_over():
         return evaluate_board(board)
@@ -149,28 +166,34 @@ def minimax(board, depth, is_maximizing):
         max_eval = float('-inf')
         for move in board.legal_moves:
             board.push(move)
-            eval = minimax(board, depth - 1, False)
+            eval = minimax(board, depth - 1, alpha, beta, False)
             board.pop()
             max_eval = max(max_eval, eval)
+            alpha = max(alpha, eval)
+            if beta <= alpha:
+                break
         return max_eval
     else:
         min_eval = float('inf')
         for move in board.legal_moves:
             board.push(move)
-            eval = minimax(board, depth - 1, True)
+            eval = minimax(board, depth - 1, alpha, beta, True)
             board.pop()
             min_eval = min(min_eval, eval)
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break
         return min_eval
 
 def make_ai_move(board, depth=3):
     """
-    Găsește cea mai bună mutare pentru AI folosind Minimax.
+    Găsește cea mai bună mutare pentru AI folosind Minimax cu Alpha-Beta Pruning.
     """
     best_move = None
     best_value = float('-inf')
     for move in board.legal_moves:
         board.push(move)
-        board_value = minimax(board, depth - 1, False)
+        board_value = minimax(board, depth - 1, float('-inf'), float('inf'), False)
         board.pop()
         if board_value > best_value:
             best_value = board_value
@@ -234,68 +257,45 @@ def setup():
 
 @app.route('/api/move', methods=['POST'])
 def move():
-    global captured_by_white, captured_by_black
     data = request.json
     fen = data['fen']
     move = f"{data['from']}{data['to']}"
-    promotion = data.get('promotion', 'q')  # Implicit promovăm la regină
+    promotion = data.get('promotion', '')  # Implicit promovăm la regină dacă este cazul
     board = chess.Board(fen)
 
     try:
-        chess_move = chess.Move.from_uci(move)
-        # Verifică dacă mutarea este validă
-        if chess_move in board.legal_moves or (
-            board.piece_at(chess_move.from_square).piece_type == chess.PAWN and
-            (chess_move.to_square in chess.SQUARES[:8] or chess_move.to_square in chess.SQUARES[-8:])
-        ):
-            # Verifică dacă este o promovare
-            if board.piece_at(chess_move.from_square).piece_type == chess.PAWN:
-                if chess_move.to_square in chess.SQUARES[:8] or chess_move.to_square in chess.SQUARES[-8:]:
-                    chess_move = chess.Move.from_uci(move + promotion)
+        # Adaugă promovarea la mutare dacă este cazul
+        chess_move = chess.Move.from_uci(move + promotion if promotion else move)
+        print(f"Attempting move: {move}, Promotion: {promotion}, Current FEN: {fen}")  # Debugging
 
-            if board.is_capture(chess_move):
-                captured_piece = board.piece_at(chess_move.to_square).symbol()
-                if board.turn:
-                    captured_by_black.append(captured_piece)
-                else:
-                    captured_by_white.append(captured_piece)
-
+        if chess_move in board.legal_moves:
             board.push(chess_move)
+            print(f"Move applied: {move}, New FEN: {board.fen()}")  # Debugging
 
             if board.is_game_over():
-                print(f"Game over detected. Checkmate: {board.is_checkmate()}, Winner: {determine_winner(board)}")  # Debugging
                 winner = determine_winner(board)
-                save_game_history([move.uci() for move in board.move_stack], winner)  # Salvează istoricul mutărilor
-                update_learning_data(winner)
                 return jsonify({
                     "status": "game_over",
                     "winner": winner,
-                    "message": f"Game over! Winner: {winner}"
+                    "fen": board.fen()
                 })
 
+            # Mutarea AI-ului
             ai_move = make_ai_move(board)
             if ai_move:
-                if board.is_capture(ai_move):
-                    captured_piece = board.piece_at(ai_move.to_square).symbol()
-                    captured_by_white.append(captured_piece)
                 board.push(ai_move)
 
-            response = {
+            return jsonify({
                 "status": "success",
                 "fen": board.fen(),
-                "captured_by_white": captured_by_white,
-                "captured_by_black": captured_by_black,
-                "score_white": calculate_score(captured_by_white),
-                "score_black": calculate_score(captured_by_black),
-                "turn": "w" if board.turn else "b",
-                "is_check": board.is_check(),
-                "is_checkmate": board.is_checkmate(),
-                "ai_move": ai_move.uci() if ai_move else None
-            }
-            return jsonify(response)
+                "ai_move": ai_move.uci() if ai_move else None,
+                "turn": "w" if board.turn else "b"
+            })
         else:
+            print(f"Illegal move: {move}")  # Debugging
             return jsonify({"status": "error", "message": "Illegal move."}), 400
     except Exception as e:
+        print(f"Error processing move: {e}")  # Debugging
         return jsonify({"status": "error", "message": str(e)}), 400
 
 @app.route('/api/legal_moves', methods=['POST'])
@@ -493,8 +493,7 @@ def make_move(data):
             game["turn"] = "w" if board.turn else "b"
 
             # Notifică jucătorii să sincronizeze starea jocului
-            emit('sync_game', {"game_id": game_id}, room=game_id)
-
+            emit('sync_game', {"game_id": game_id, "fen": game["fen"], "turn": game["turn"]}, room=game_id)
             if board.is_game_over():
                 winner = determine_winner(board)
                 emit('game_over', {"winner": winner, "fen": game["fen"]}, room=game_id)

@@ -204,6 +204,64 @@ const Board = () => {
     socket.emit("make_move", { game_id: gameId, move, promotion });
   };
 
+  const onDropAI = ({ sourceSquare, targetSquare }) => {
+    const chess = new Chess(gameState.fen);
+
+    // Verifică dacă piesa este un pion
+    const piece = chess.get(sourceSquare);
+    if (!piece) {
+      alert("No piece on the selected square!");
+      return;
+    }
+
+    console.log("Selected piece:", piece); // Debugging
+
+    const isPawnPromotion = checkPawnPromotion(sourceSquare, targetSquare);
+    const promotion = isPawnPromotion ? "q" : null;
+
+    const move = chess.move({
+      from: sourceSquare,
+      to: targetSquare,
+      promotion: promotion, // Promovare implicită
+    });
+
+    if (move === null) {
+      alert("Illegal move!");
+      return;
+    }
+
+    console.log("Attempting move:", move.san, "FEN:", chess.fen()); // Debugging
+
+    axios
+      .post("http://127.0.0.1:5000/api/move", {
+        fen: gameState.fen,
+        from: sourceSquare,
+        to: targetSquare,
+        promotion, // Trimite promovarea
+      })
+      .then((response) => {
+        console.log("Move response:", response.data); // Debugging
+        if (response.data.status === "success") {
+          setGameState((prev) => ({
+            ...prev,
+            fen: response.data.fen,
+            turn: response.data.turn,
+          }));
+        } else if (response.data.status === "game_over") {
+          alert(`Game over! Winner: ${response.data.winner}`);
+          resetGame(); // Resetează jocul automat
+        }
+      })
+      .catch((error) => {
+        console.error("Error making move:", error);
+      });
+  };
+
+  const onDropMultiplayer = ({ sourceSquare, targetSquare }) => {
+    const move = `${sourceSquare}${targetSquare}`;
+    socket.emit("make_move", { game_id: gameId, move });
+  };
+
   const onMouseOverSquare = (square) => {
     try {
       const chess = new Chess(gameState.fen);
@@ -328,7 +386,7 @@ const Board = () => {
         </div>
         <Chessboard
           position={gameState.fen}
-          onDrop={onDrop}
+          onDrop={onDrop} // Folosește onDrop pentru multiplayer
           onMouseOverSquare={onMouseOverSquare}
           onMouseOutSquare={onMouseOutSquare}
           squareStyles={highlightedSquares}
@@ -346,38 +404,10 @@ const Board = () => {
       </header>
 
       <div className="game-container">
-        <div className="left-panel">
-          <Score
-            scoreBlack={gameState.scoreBlack}
-            scoreWhite={gameState.scoreWhite}
-            isCheck={gameState.isCheck}
-            isCheckmate={gameState.isCheckmate}
-          />
-
-          {learningData && (
-            <div className="learning-data">
-              <h3>Learning Data</h3>
-              <p>
-                <strong>Games Played:</strong> {learningData.games_played}
-              </p>
-              <h4>Piece Values:</h4>
-              <ul>
-                {Object.entries(learningData.piece_values).map(
-                  ([piece, value]) => (
-                    <li key={piece}>
-                      {piece}: {value.toFixed(2)}
-                    </li>
-                  )
-                )}
-              </ul>
-            </div>
-          )}
-        </div>
-
         <div className="chessboard-container">
           <Chessboard
             position={gameState.fen}
-            onDrop={onDrop}
+            onDrop={onDropAI} // Folosește onDropAI pentru AI
             onMouseOverSquare={onMouseOverSquare}
             onMouseOutSquare={onMouseOutSquare}
             squareStyles={highlightedSquares}
@@ -385,34 +415,6 @@ const Board = () => {
           />
           <div className="turn-indicator">
             <h3>Turn: {gameState.turn === "w" ? "White" : "Black"}</h3>
-          </div>
-        </div>
-
-        <div className="right-panel">
-          <div className="captured-pieces">
-            <h3>Captured by Player:</h3>
-            <div className="pieces">
-              {capturedPieces.black.map((piece, index) => (
-                <img
-                  key={index}
-                  src={`/assets/chess-pieces/${piece}.png`}
-                  alt={piece}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="captured-pieces">
-            <h3>Captured by Bot:</h3>
-            <div className="pieces">
-              {capturedPieces.white.map((piece, index) => (
-                <img
-                  key={index}
-                  src={`/assets/chess-pieces/${piece}.png`}
-                  alt={piece}
-                />
-              ))}
-            </div>
           </div>
         </div>
       </div>
