@@ -1,45 +1,56 @@
-# chess\_project\_fac
+# chess\_project\_fac 🎉♟️
 
-Proiect de Inteligență Artificială pentru jocul de șah, cu suport pentru varianta Fischer Random Chess și unui AI antrenabil.
+Proiect de Inteligență Artificială pentru jocul de șah, cu suport pentru varianta Fischer Random Chess (Chess960) și un AI antrenabil.
 
-## Cuprins
+## 📖 Cuprins
 
-* [Prezentare](#prezentare)
-* [Funcționalități](#funcționalități)
-* [Structura proiectului](#structura-proiectului)
-* [Instalare](#instalare)
-* [Configurare](#configurare)
-* [Utilizare](#utilizare)
-* [Date și antrenare AI](#date-și-antrenare-ai)
-* [Contribuții](#contribuții)
-* [Licență](#licență)
+* [🚀 Prezentare](#🚀-prezentare)
+* [✨ Funcționalități](#✨-funcționalități)
+* [📂 Structura proiectului](#📂-structura-proiectului)
+* [⚙️ Instalare](#⚙️-instalare)
+* [🔧 Configurare](#🔧-configurare)
+* [🏃 Utilizare](#🏃-utilizare)
+* [📊 Date și antrenare AI](#📊-date-și-antrenare-ai)
+* [🤝 Contribuții](#🤝-contribuții)
+* [📝 Licență](#📝-licență)
 
-## Prezentare
+---
 
-Acest proiect îmbină o interfață web de șah cu un modul de inteligență artificială care poate fi antrenat să joace atât șah clasic, cât și varianta Fischer Random Chess (cunoscută și ca Chess960).
+## 🚀 Prezentare
 
-## Funcționalități
+Acest proiect îmbină o interfață web modernă de șah cu un modul de Inteligență Artificială care poate învăța și juca atât șah clasic, cât și Fischer Random Chess (Chess960).
 
-* **Joc de șah tradițional** și **Fischer Random Chess**
-* AI bazat pe algoritmi de machine learning pentru generarea și evaluarea mutărilor
-* Interfață web modernă (JavaScript, HTML, SCSS/CSS)
-* Backend Python pentru antrenarea și rularea modelului AI
-* Salvarea istoricului jocurilor și a datelor de învățare în fișiere JSON
+> **Demo interfață web**
+>
+> ![Captură ecran interfață](images/screenshot_ui.png)
 
-## Structura proiectului
+## ✨ Funcționalități
+
+* 🎲 **Joc de șah tradițional** și **Fischer Random Chess (Chess960)**
+* 🤖 AI bazat pe machine learning pentru generarea și evaluarea mutărilor
+* 🌐 Interfață web modernă (JavaScript, HTML, SCSS/CSS)
+* 🐍 Backend Python pentru antrenarea și rularea modelului AI
+* 💾 Salvarea istoricului jocurilor și a datelor de învățare în fișiere JSON
+
+## 📂 Structura proiectului
 
 ```
 chess_project_fac/
+├── images/                    # Capturi ecran și setup Fischer Random
 ├── fisher-random-chess/       # Cod Python pentru AI și varianta Fischer Random
 ├── node_modules/              # Dependențe frontend (JavaScript)
 ├── game_history.json          # Istoric al jocurilor jucate
 ├── learning_data.json         # Date de antrenament pentru AI
 ├── package.json               # Configurație npm (frontend)
 ├── package-lock.json          # Versiuni exacte ale pachetelor npm
-├── README.md                  # Acest fișier
+└── README.md                  # Acest fișier
 ```
 
-## Instalare
+> **Exemplu setup Chess960**
+>
+> ![Setup Fischer Random Chess](images/chess960_setup.png)
+
+## ⚙️ Instalare
 
 ### 1. Clonare proiect
 
@@ -72,11 +83,11 @@ pip install -r requirements.txt
 
 În lipsa lui, instalează manual bibliotecile necesare (de ex. `numpy`, `torch`, etc.).
 
-## Configurare
+## 🔧 Configurare
 
-Adaugă sau modifică fișierele de configurare din directorul `fisher-random-chess/` în funcție de parametri de antrenare și de setările AI.
+Modifică parametrii de antrenare și setările AI în fișierele din `fisher-random-chess/config/` (ex. `config.yaml`).
 
-## Utilizare
+## 🏃 Utilizare
 
 ### Pornire frontend
 
@@ -84,26 +95,27 @@ Adaugă sau modifică fișierele de configurare din directorul `fisher-random-ch
 npm start
 ```
 
-Deschide apoi în browser: `http://localhost:3000`
+Deschide apoi în browser: `http://localhost:3000` 📍
 
 ### Rulare/antrenare AI
 
 ```bash
-# Exemplu de comandă (în directorul root)
+# Antrenare model AI
 python fisher-random-chess/train_ai.py
-# Sau pentru a juca direct contra AI:
+
+# Joacă direct contra AI
 python fisher-random-chess/play_vs_ai.py
 ```
 
-## Date și antrenare AI
+## 📊 Date și antrenare AI
 
 * **game\_history.json**: înregistrează succesiunea mutărilor din partidele jucate
 * **learning\_data.json**: date preprocesate pentru etapa de învățare a modelului AI
 
-## Contribuții
+## 🤝 Contribuții
 
-Contribuțiile sunt binevenite! Pentru schimbări majore, te rugăm să deschizi un issue înainte de a propune un pull request.
+Contribuțiile sunt binevenite! Pentru schimbări majore, deschide un *issue* înainte de a propune un *pull request*. 🙌
 
-## Licență
+## 📝 Licență
 
 Acest proiect este licențiat sub licența MIT. Vezi fișierul `LICENSE` pentru detalii.
