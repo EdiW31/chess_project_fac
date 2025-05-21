@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import Chessboard from "chessboardjsx";
 import axios from "axios";
 import { Chess } from "chess.js";
-import Score from "./Score.js";
 import GameModeSelection from "./GameModeSelection";
 import "../styles/Board.scss";
 import { io } from "socket.io-client";
@@ -12,6 +11,7 @@ const socket = io("http://127.0.0.1:5000"); // Adresa backend-ului
 const Board = () => {
   const [gameMode, setGameMode] = useState(null); // "ai" sau "friend"
   const [gameId, setGameId] = useState(null);
+  const [joinInput, setJoinInput] = useState("");
 
   // State declarations
   const [gameState, setGameState] = useState({
@@ -187,18 +187,18 @@ const Board = () => {
   };
 
   const joinMultiplayerGame = () => {
-    if (!gameId) {
+    if (!joinInput) {
       alert("Please enter a valid Game ID.");
       return;
     }
-
-    socket.emit("join_game", { game_id: gameId });
+    setGameId(joinInput);
+    socket.emit("join_game", { game_id: joinInput });
   };
 
   // Event handlers
   const onDrop = ({ sourceSquare, targetSquare }) => {
     const isPawnPromotion = checkPawnPromotion(sourceSquare, targetSquare);
-    const promotion = isPawnPromotion ? "q" : null;
+    const promotion = isPawnPromotion ? "q" : undefined;
 
     const move = `${sourceSquare}${targetSquare}`;
     socket.emit("make_move", { game_id: gameId, move, promotion });
@@ -217,7 +217,7 @@ const Board = () => {
     console.log("Selected piece:", piece); // Debugging
 
     const isPawnPromotion = checkPawnPromotion(sourceSquare, targetSquare);
-    const promotion = isPawnPromotion ? "q" : null;
+    const promotion = isPawnPromotion ? "q" : undefined;
 
     const move = chess.move({
       from: sourceSquare,
@@ -294,15 +294,24 @@ const Board = () => {
 
   // Helper functions
   const checkPawnPromotion = (sourceSquare, targetSquare) => {
-    const isWhitePawn =
-      gameState.fen.split(" ")[1] === "w" &&
+    const chess = new Chess(gameState.fen);
+    const piece = chess.get(sourceSquare);
+    if (!piece || piece.type !== "p") return false;
+    // pion alb pe linia 7 spre linia 8
+    if (
+      piece.color === "w" &&
       sourceSquare[1] === "7" &&
-      targetSquare[1] === "8";
-    const isBlackPawn =
-      gameState.fen.split(" ")[1] === "b" &&
+      targetSquare[1] === "8"
+    )
+      return true;
+    // pion negru pe linia 2 spre linia 1
+    if (
+      piece.color === "b" &&
       sourceSquare[1] === "2" &&
-      targetSquare[1] === "1";
-    return isWhitePawn || isBlackPawn;
+      targetSquare[1] === "1"
+    )
+      return true;
+    return false;
   };
 
   const makeMove = (sourceSquare, targetSquare) => {
@@ -368,8 +377,8 @@ const Board = () => {
           <input
             type="text"
             placeholder="Enter Game ID"
-            value={gameId || ""}
-            onChange={(e) => setGameId(e.target.value)}
+            value={joinInput}
+            onChange={(e) => setJoinInput(e.target.value)}
           />
           <button onClick={joinMultiplayerGame}>Join Game</button>
           <button onClick={startMultiplayerGame}>Start New Game</button>

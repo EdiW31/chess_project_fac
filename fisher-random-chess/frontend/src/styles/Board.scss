@@ -1,9 +1,10 @@
-body {
-  font-family: "Arial", sans-serif;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  color: #fff;
+body,
+html {
+  min-height: 100vh;
   margin: 0;
   padding: 0;
+  font-family: "Segoe UI", "Roboto", Arial, sans-serif;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
 }
 
 h2 {
@@ -12,6 +13,29 @@ h2 {
   margin: 20px 0;
   color: #ffcc00;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.chess-game,
+.game-container,
+.chessboard-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.chess-game {
+  min-height: 100vh;
+  background: transparent;
+  color: #fff;
+}
+
+header {
+  margin-bottom: 24px;
+  font-size: 2.2rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 16px #0008;
 }
 
 .game-container {
@@ -23,11 +47,13 @@ h2 {
 }
 
 .chessboard-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-  
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  margin-bottom: 32px;
+  animation: fadeIn 1s;
+
   .square-highlight {
     background: rgba(255, 255, 0, 0.4) !important;
     border-radius: 50%;
@@ -139,19 +165,36 @@ h2 {
 }
 
 button {
-  background: #ffcc00;
-  color: #1e3c72;
+  background: linear-gradient(90deg, #ffb347 0%, #ffcc80 100%);
+  color: #222;
   border: none;
-  padding: 10px 20px;
-  font-size: 1rem;
-  border-radius: 5px;
+  border-radius: 12px;
+  padding: 12px 28px;
+  margin: 8px;
+  font-weight: bold;
+  font-size: 1.1rem;
   cursor: pointer;
-  transition: background 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 2px 8px #0002;
+  transition: background 0.2s, transform 0.2s;
+}
+button:hover {
+  background: linear-gradient(90deg, #ffcc80 0%, #ffb347 100%);
+  transform: translateY(-2px) scale(1.04);
+}
 
-  &:hover {
-    background: #ffd633;
-    transform: scale(1.05);
-  }
+input[type="text"] {
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  padding: 10px 16px;
+  margin-right: 8px;
+  font-size: 1rem;
+  background: #fff8;
+  color: #222;
+  outline: none;
+  transition: border 0.2s;
+}
+input[type="text"]:focus {
+  border: 2px solid #ffb347;
 }
 
 .game-status {
@@ -210,4 +253,9 @@ button {
   &:hover {
     background: #ffd633;
   }
+}
+
+[class^="piece-"],
+[class*=" piece-"] {
+  transition: transform 0.3s cubic-bezier(0.4, 2, 0.6, 1);
 }
